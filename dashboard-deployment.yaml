@@ -18,7 +18,7 @@ spec:
       serviceAccountName: astra-dashboard-sa # Added the service account here
       containers:
         - name: astra-xdr-dashboard
-          image: mrrobot7781/astra-xdr-dashboard:latest
+          image: vir7502/astra-xdr-dashboard:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5000

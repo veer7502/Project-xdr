@@ -17,7 +17,7 @@ spec:
       terminationGracePeriodSeconds: 5
       containers:
         - name: employee-app
-          image: mrrobot7781/astra-xdr-app:latest
+          image: vir7502/astra-xdr-app:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000

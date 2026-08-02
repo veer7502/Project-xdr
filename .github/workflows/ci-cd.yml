@@ -66,8 +66,8 @@ jobs:
           SONAR_HOST_URL: "https://sonarcloud.io"
         with:
           args: >
-            -Dsonar.projectKey=mrrobot7781_project-xdr
-            -Dsonar.organization=mrrobot7781
+            -Dsonar.projectKey=veer7502_Project-xdr
+            -Dsonar.organization=veer7502
             -Dsonar.sources=.
             -Dsonar.python.coverage.reportPaths=coverage.xml
 
@@ -227,44 +227,44 @@ jobs:
   # -------------------------------------------------------------
   # Job 6: AI Remediation Summary
   # -------------------------------------------------------------
-  ai-remediation:
-    name: Generate AI Security Summary
-    runs-on: ubuntu-latest
-    # Added cd-deploy-k8s here so the webhook waits for the new UI to be online
-    needs: [sonarqube, dast-scan, cd-deploy-k8s] 
+  # ai-remediation:
+  #   name: Generate AI Security Summary
+  #   runs-on: ubuntu-latest
+  #   # Added cd-deploy-k8s here so the webhook waits for the new UI to be online
+  #   needs: [sonarqube, dast-scan, cd-deploy-k8s] 
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.10'
 
-      - name: Install Google Gen AI SDK
-        # Ensure requests library is installed here for the webhook
-        run: pip install -q -U google-genai requests 
+  #     - name: Install Google Gen AI SDK
+  #       # Ensure requests library is installed here for the webhook
+  #       run: pip install -q -U google-genai requests 
 
-      # Download all the artifacts generated in previous steps
-      - name: Download Trivy Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: trivy-security-report
+  #     # Download all the artifacts generated in previous steps
+  #     - name: Download Trivy Artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: trivy-security-report
 
-      - name: Download ZAP Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: zap-dast-security-report
+  #     - name: Download ZAP Artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: zap-dast-security-report
 
-      # Note: You will need to add a step in your SonarQube job to export
-      # the SonarQube results to a 'sonar-report.json' file and upload it as an artifact.
-      # For now, we will create a dummy file so the script doesn't fail.
-      - name: Create Dummy Sonar Report
-        run: echo "{}" > sonar-report.json
+  #     # Note: You will need to add a step in your SonarQube job to export
+  #     # the SonarQube results to a 'sonar-report.json' file and upload it as an artifact.
+  #     # For now, we will create a dummy file so the script doesn't fail.
+  #     - name: Create Dummy Sonar Report
+  #       run: echo "{}" > sonar-report.json
 
-      - name: Generate and Publish AI Summary
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
-        run: |
-          python scripts/ai_remediation.py
+  #     - name: Generate and Publish AI Summary
+  #       env:
+  #         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
+  #       run: |
+  #         python scripts/ai_remediation.py
