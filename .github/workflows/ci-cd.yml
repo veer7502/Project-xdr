@@ -89,7 +89,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: vir7502
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Debug (remove later)
@@ -107,8 +107,8 @@ jobs:
           push: false
           load: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:latest
+            vir7502/astra-xdr-app:${{ github.sha }}
+            vir7502/astra-xdr-app:latest
 
       - name: Build Dashboard Image
         uses: docker/build-push-action@v6
@@ -118,13 +118,13 @@ jobs:
           push: false
           load: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:latest
+            vir7502/astra-xdr-dashboard:${{ github.sha }}
+            vir7502/astra-xdr-dashboard:latest
 
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }}"
+          image-ref: "vir7502/astra-xdr-app:${{ github.sha }}"
           format: table
           output: trivy-report.txt
           exit-code: 0
@@ -138,13 +138,13 @@ jobs:
 
       - name: Push Main Image
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:latest
+          docker push vir7502/astra-xdr-app:${{ github.sha }}
+          docker push vir7502/astra-xdr-app:latest
 
       - name: Push Dashboard Image
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:latest
+          docker push vir7502/astra-xdr-dashboard:${{ github.sha }}
+          docker push vir7502/astra-xdr-dashboard:latest
   # -------------------------------------------------------------
   # Job 4: DAST Scan via Direct Docker Container
   # -------------------------------------------------------------
