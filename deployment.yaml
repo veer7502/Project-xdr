@@ -1,23 +1,13 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: employee-app
-  labels:
-    app: employee-app
 spec:
-  replicas: 1
+  type: NodePort
   selector:
-    matchLabels:
-      app: employee-app
-  template:
-    metadata:
-      labels:
-        app: employee-app
-    spec:
-      terminationGracePeriodSeconds: 5
-      containers:
-        - name: employee-app
-          image: vir7502/astra-xdr-app:latest
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 5000
+    app: employee-app
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+      nodePort: 30080

@@ -1,24 +1,13 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: astra-xdr-dashboard
-  labels:
-    app: astra-xdr-dashboard
 spec:
-  replicas: 1
+  type: NodePort
   selector:
-    matchLabels:
-      app: astra-xdr-dashboard
-  template:
-    metadata:
-      labels:
-        app: astra-xdr-dashboard
-    spec:
-      terminationGracePeriodSeconds: 5
-      serviceAccountName: astra-dashboard-sa # Added the service account here
-      containers:
-        - name: astra-xdr-dashboard
-          image: vir7502/astra-xdr-dashboard:latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 5000
+    app: astra-xdr-dashboard
+  ports:
+    - protocol: TCP
+      port: 5001
+      targetPort: 5001
+      nodePort: 30081
