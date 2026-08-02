@@ -15,7 +15,6 @@ import os
 
 app = Flask(__name__)
 
-# FIX FOR PYTEST: Added root route '/' to resolve 404 error during CI/CD testing
 @app.route('/')
 def home():
     return render_template_string(LOGIN_TEMPLATE)
