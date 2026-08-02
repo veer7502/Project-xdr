@@ -225,7 +225,7 @@ jobs:
             cat /tmp/pf-employee.log || true
 
   # -------------------------------------------------------------
-  # Job 6: AI Remediation Summary
+  # Job 6: AI Remediation Sum  mary
   # -------------------------------------------------------------
   # ai-remediation:
   #   name: Generate AI Security Summary
