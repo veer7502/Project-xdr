@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: astra-xdr-dashboard
+  labels:
+    app: astra-xdr-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: astra-xdr-dashboard
+  template:
+    metadata:
+      labels:
+        app: astra-xdr-dashboard
+    spec:
+      terminationGracePeriodSeconds: 5
+      serviceAccountName: astra-dashboard-sa # Added the service account here
+      containers:
+        - name: astra-xdr-dashboard
+          image: mrrobot7781/astra-xdr-dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000

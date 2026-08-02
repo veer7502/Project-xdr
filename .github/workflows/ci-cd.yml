@@ -1,0 +1,270 @@
+name: ASTRA-XDR CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # -------------------------------------------------------------
+  # Job 1: Unit Testing & Coverage
+  # -------------------------------------------------------------
+  unit-tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest with Coverage
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest --cov=. --cov-report=xml
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # -------------------------------------------------------------
+  # Job 2: SonarQube Static Analysis (SAST)
+  # -------------------------------------------------------------
+  sonarqube:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Coverage Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: "https://sonarcloud.io"
+        with:
+          args: >
+            -Dsonar.projectKey=mrrobot7781_project-xdr
+            -Dsonar.organization=mrrobot7781
+            -Dsonar.sources=.
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+
+  # -------------------------------------------------------------
+  # Job 3: Build, Scan & Push Docker Images to Docker Hub
+  # -------------------------------------------------------------
+  docker-build-push:
+    name: Build, Scan & Push to Docker Hub
+    runs-on: ubuntu-latest
+    needs: [unit-tests, sonarqube]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Images locally for Scanning
+        run: |
+          # 1. Build the main application
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }} -t ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:latest .
+          
+          # 2. Build the dashboard application (Change 'Dockerfile.dashboard' if yours is named differently)
+          docker build -f Dockerfile.dashboard -t ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:${{ github.sha }} -t ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:latest .
+
+      - name: Run Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }}'
+          format: 'table'
+          output: 'trivy-report.txt'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-security-report
+          path: trivy-report.txt
+
+      - name: Push Images to Docker Hub
+        run: |
+          # Push Main App
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:latest
+          
+          # Push Dashboard App
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:latest
+
+  # -------------------------------------------------------------
+  # Job 4: DAST Scan via Direct Docker Container
+  # -------------------------------------------------------------
+  dast-scan:
+    name: OWASP ZAP DAST Scan
+    runs-on: ubuntu-latest
+    needs: docker-build-push
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build and Run Application Locally
+        run: |
+          docker build -t test-app .
+          docker run -d -p 5000:5000 --name running-app test-app
+          sleep 5
+
+      - name: Fix Workspace Directory Permissions
+        run: sudo chmod -R 777 .
+
+      - name: Run OWASP ZAP DAST Scan
+        run: |
+          docker run --rm -v $(pwd):/zap/wrk/:rw --network=host -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://localhost:5000 -J report_json.json -w report_md.md -r report_html.html || true
+
+      - name: Stop Running Container
+        if: always()
+        run: docker stop running-app || true
+
+      - name: Upload ZAP DAST Security Report (v4)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-dast-security-report
+          path: |
+            report_html.html
+            report_md.md
+            report_json.json
+
+  # -------------------------------------------------------------
+  # Job 5: Continuous Deployment to Kubernetes
+  # -------------------------------------------------------------
+  cd-deploy-k8s:
+    name: Continuous Deployment to Kubernetes
+    needs: dast-scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Execute SSH commands
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            export KUBECONFIG=/home/ubuntu/.kube/config
+
+            cd /home/ubuntu/project-xdr
+
+            git pull origin main
+
+            kubectl apply -f rbac.yaml
+
+            kubectl apply -f deployment.yaml
+
+            kubectl apply -f dashboard-deployment.yaml
+
+            kubectl apply -f k8s/employee-app.yaml
+
+            kubectl rollout restart deployment/employee-app
+            kubectl rollout restart deployment/astra-xdr-dashboard
+
+            kubectl rollout status deployment/employee-app --timeout=120s
+            kubectl rollout status deployment/astra-xdr-dashboard --timeout=120s
+
+            echo "Waiting for rollout..."
+            sleep 30
+
+            chmod +x /home/ubuntu/start-port-forward.sh
+
+            sudo systemctl restart xdr-portforward
+
+            sleep 10
+
+            echo "===== SERVICE STATUS ====="
+            sudo systemctl status xdr-portforward --no-pager
+
+            echo "===== PORTS ====="
+            sudo ss -tulpn | grep 30081 || true
+            sudo ss -tulpn | grep 30082 || true
+
+            echo "===== DASHBOARD LOG ====="
+            cat /tmp/pf-dashboard.log || true
+
+            echo "===== EMPLOYEE LOG ====="
+            cat /tmp/pf-employee.log || true
+
+  # -------------------------------------------------------------
+  # Job 6: AI Remediation Summary
+  # -------------------------------------------------------------
+  ai-remediation:
+    name: Generate AI Security Summary
+    runs-on: ubuntu-latest
+    # Added cd-deploy-k8s here so the webhook waits for the new UI to be online
+    needs: [sonarqube, dast-scan, cd-deploy-k8s] 
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Google Gen AI SDK
+        # Ensure requests library is installed here for the webhook
+        run: pip install -q -U google-genai requests 
+
+      # Download all the artifacts generated in previous steps
+      - name: Download Trivy Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-security-report
+
+      - name: Download ZAP Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zap-dast-security-report
+
+      # Note: You will need to add a step in your SonarQube job to export
+      # the SonarQube results to a 'sonar-report.json' file and upload it as an artifact.
+      # For now, we will create a dummy file so the script doesn't fail.
+      - name: Create Dummy Sonar Report
+        run: echo "{}" > sonar-report.json
+
+      - name: Generate and Publish AI Summary
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
+        run: |
+          python scripts/ai_remediation.py

@@ -1,0 +1,59 @@
+name: Deploy Project XDR via Self-Hosted Runner
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Ensure Minikube Cluster
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+          if ! minikube status | grep -q "Running"; then
+            echo "Starting Minikube..."
+            minikube start --driver=docker
+          fi
+          minikube update-context
+
+      - name: Deploy Kubernetes Manifests
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+          kubectl apply -f rbac.yaml
+          kubectl apply -f deployment.yaml
+          kubectl apply -f dashboard-deployment.yaml
+          kubectl apply -f k8s/employee-app.yaml
+
+      - name: Restart Workloads
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+          kubectl rollout restart deployment/employee-app
+          kubectl rollout restart deployment/astra-xdr-dashboard
+
+      - name: Verify Rollout Status
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+          kubectl rollout status deployment/employee-app --timeout=60s || true
+          kubectl rollout status deployment/astra-xdr-dashboard --timeout=60s || true
+
+      - name: Maintain Background Port Forwarding
+        run: |
+          # Clean old port forwards
+          sudo pkill -9 -f "port-forward" || true
+          sudo fuser -k -9 30080/tcp || true
+          sudo fuser -k -9 30081/tcp || true
+          sleep 2
+
+          # Start persistent background processes
+          nohup kubectl --kubeconfig=$HOME/.kube/config port-forward --address 0.0.0.0 svc/employee-app-service 30080:5000 > /tmp/emp.log 2>&1 &
+          nohup kubectl --kubeconfig=$HOME/.kube/config port-forward --address 0.0.0.0 svc/astra-xdr-dashboard-service 30081:5000 > /tmp/dash.log 2>&1 &
+
+          sleep 3
+          curl -I http://localhost:30080 || true
+          curl -I http://localhost:30081 || true

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: employee-app
+  labels:
+    app: employee-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: employee-app
+  template:
+    metadata:
+      labels:
+        app: employee-app
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: employee-app
+          image: mrrobot7781/astra-xdr-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
