@@ -72,7 +72,7 @@ jobs:
             -Dsonar.python.coverage.reportPaths=coverage.xml
 
   # -------------------------------------------------------------
-  # Job 3: Build, Scan & Push Docker Images to Docker Hub
+  # Job 3: Build, Scan & Push Docker Images to Doc ker Hub
   # -------------------------------------------------------------
   docker-build-push:
   name: Build, Scan & Push to Docker Hub
