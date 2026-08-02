@@ -122,7 +122,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-dashboard:latest
 
       - name: Run Trivy Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: "${{ secrets.DOCKERHUB_USERNAME }}/astra-xdr-app:${{ github.sha }}"
           format: table
